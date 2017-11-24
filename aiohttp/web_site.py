@@ -5,6 +5,10 @@ from abc import ABC, abstractmethod
 
 from yarl import URL
 
+from .abc import AbstractAccessLogger
+from .helpers import AccessLogger
+from .web_server import Server
+
 
 __all__ = ('TCPSite', 'UnixSite', 'SockSite', 'AppRunner', 'GracefulExit')
 
@@ -125,10 +129,25 @@ class SockSite(BaseSite):
 
 
 class AppRunner:
-    def __init__(self, app, *, handle_signals=False, **kwargs):
+    def __init__(self, app, *, handle_signals=False,
+                 access_log_class=AccessLogger,
+                 **kwargs):
+        if not issubclass(access_log_class, AbstractAccessLogger):
+            raise TypeError(
+                'access_log_class must be subclass of '
+                'aiohttp.abc.AbstractAccessLogger, got {}'.format(
+                    access_log_class))
         self._app = app
         self._handle_signals = handle_signals
-        self._kwargs = kwargs
+
+        # merge kwargs
+        self._kwargs = {}
+        if app._handler_args is not None:
+            self._kwargs.update(app._handler_args)
+        if (access_log_class is not AccessLogger and
+                'access_log_class' not in self._kwargs):
+            self._kwargs['access_log_class'] = access_log_class
+        self._kwargs.update(kwargs)
         self._handler = None
         self._sites = set()
 
@@ -155,12 +174,18 @@ class AppRunner:
                 # add_signal_handler is not implemented on Windows
                 pass
 
-        self._app._set_loop(loop)
-        self._app.on_startup.freeze()
-        await self._app.startup()
-        self._app.freeze()
+        app = self._app
+        app._set_loop(loop)
 
-        handler = self._app.make_handler(loop=loop, **self._kwargs)
+        # _set_loop selects proper app.debug
+        self._kwargs['debug'] = app.debug
+
+        app.on_startup.freeze()
+        await app.startup()
+        app.freeze()
+
+        handler = Server(app._handle, request_factory=app._make_request,
+                         loop=loop, **self._kwargs)
         self._handler = handler
 
     async def cleanup(self):

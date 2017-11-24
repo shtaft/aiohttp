@@ -1204,7 +1204,7 @@ properties for later access from a :ref:`handler<aiohttp-web-handler>` via the
 Although :class:`Application` is a :obj:`dict`-like object, it can't be
 duplicated like one using :meth:`Application.copy`.
 
-.. class:: Application(*, logger=<default>, router=None,middlewares=(), \
+.. class:: Application(*, logger=<default>, router=None, middlewares=(), \
                        handler_args=None, client_max_size=1024**2, \
                        loop=None, debug=...)
 
