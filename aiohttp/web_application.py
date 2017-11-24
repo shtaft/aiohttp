@@ -4,14 +4,12 @@ from collections import MutableMapping
 from functools import partial
 
 from . import hdrs
-from .abc import AbstractAccessLogger, AbstractMatchInfo, AbstractRouter
+from .abc import AbstractMatchInfo, AbstractRouter
 from .frozenlist import FrozenList
-from .helpers import AccessLogger
 from .log import web_logger
 from .signals import Signal
 from .web_request import Request
 from .web_response import StreamResponse
-from .web_server import Server
 from .web_urldispatcher import PrefixedSubAppResource, UrlDispatcher
 
 
@@ -178,29 +176,6 @@ class Application(MutableMapping):
     @property
     def middlewares(self):
         return self._middlewares
-
-    def make_handler(self, *,
-                     loop=None,
-                     access_log_class=AccessLogger,
-                     **kwargs):
-
-        if not issubclass(access_log_class, AbstractAccessLogger):
-            raise TypeError(
-                'access_log_class must be subclass of '
-                'aiohttp.abc.AbstractAccessLogger, got {}'.format(
-                    access_log_class))
-
-        self._set_loop(loop)
-        self.freeze()
-
-        kwargs['debug'] = self.debug
-        if self._handler_args:
-            for k, v in self._handler_args.items():
-                kwargs[k] = v
-
-        return Server(self._handle, request_factory=self._make_request,
-                      access_log_class=access_log_class,
-                      loop=self.loop, **kwargs)
 
     async def startup(self):
         """Causes on_startup signal

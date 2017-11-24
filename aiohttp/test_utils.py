@@ -20,7 +20,7 @@ from . import ClientSession, hdrs
 from .helpers import sentinel
 from .http import HttpVersion, RawRequestMessage
 from .signals import Signal
-from .web import Request, Server, UrlMappingMatchInfo
+from .web import AppRunner, Request, Server, UrlMappingMatchInfo
 
 
 def run_briefly(loop):
@@ -135,20 +135,17 @@ class TestServer(BaseTestServer):
 
     def __init__(self, app, *,
                  scheme=sentinel, host='127.0.0.1', **kwargs):
+        kwargs.pop('loop', None)
         self.app = app
+        self._runner = AppRunner(app, **kwargs)
         super().__init__(scheme=scheme, host=host, **kwargs)
 
     async def _make_factory(self, **kwargs):
-        self.app._set_loop(self._loop)
-        self.app.freeze()
-        await self.app.startup()
-        self.handler = self.app.make_handler(loop=self._loop, **kwargs)
-        return self.handler
+        await self._runner.setup()
+        return self._runner.handler
 
     async def _close_hook(self):
-        await self.app.shutdown()
-        await self.handler.shutdown()
-        await self.app.cleanup()
+        await self._runner.cleanup()
 
 
 class RawTestServer(BaseTestServer):
